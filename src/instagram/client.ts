@@ -9,6 +9,7 @@ import type {
   InstagramMedia,
   PublishResult,
   PublishingLimit,
+  CarouselItemInput,
 } from './types.js';
 
 export class InstagramApiError extends Error {
@@ -147,5 +148,25 @@ export class InstagramClient {
     if (['VIDEO', 'REELS', 'STORIES'].includes(input.mediaType)) await this.waitForContainer(container.id);
     const published = await this.publishContainer(container.id);
     return { containerId: container.id, mediaId: published.id };
+  }
+
+  async publishCarousel(items: CarouselItemInput[], caption?: string): Promise<PublishResult> {
+    if (items.length < 2 || items.length > 10) {
+      throw new Error('Carousel posts require 2 to 10 items');
+    }
+    const childContainers = await Promise.all(items.map((item) => this.createContainer({
+      mediaType: item.mediaType,
+      imageUrl: item.imageUrl,
+      videoUrl: item.videoUrl,
+      isCarouselItem: true,
+    })));
+    for (const [index, item] of items.entries()) {
+      const child = childContainers[index];
+      if (!child) throw new Error(`Carousel child container ${index + 1} was not created`);
+      if (item.mediaType === 'VIDEO') await this.waitForContainer(child.id);
+    }
+    const carousel = await this.createContainer({ mediaType: 'CAROUSEL', children: childContainers.map((item) => item.id), caption });
+    const published = await this.publishContainer(carousel.id);
+    return { containerId: carousel.id, mediaId: published.id };
   }
 }

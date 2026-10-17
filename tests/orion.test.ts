@@ -32,6 +32,16 @@ describe('InstagramClient', () => {
     await assert.rejects(() => client.createContainer({ mediaType: 'IMAGE', imageUrl: 'http://localhost/photo.jpg' }), /must use HTTPS/);
     assert.equal(called, false);
   });
+
+  it('assembles child containers into a carousel before publishing', async () => {
+    const responses = [{ id: 'child-1' }, { id: 'child-2' }, { id: 'carousel-1' }, { id: 'media-2' }];
+    const client = new InstagramClient(options, async () => new Response(JSON.stringify(responses.shift()), { status: 200 }));
+    const result = await client.publishCarousel([
+      { mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/one.jpg' },
+      { mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/two.jpg' },
+    ], 'carousel caption');
+    assert.deepEqual(result, { containerId: 'carousel-1', mediaId: 'media-2' });
+  });
 });
 
 describe('Orion HTTP API', () => {
@@ -41,6 +51,7 @@ describe('Orion HTTP API', () => {
     getPostInsights: async () => ({ data: [{ name: 'reach', values: [{ value: 10 }] }] }),
     getPublishingLimit: async () => ({ data: [{ quota_usage: 4, config: { quota_total: 100 } }] }),
     publish: async () => ({ containerId: 'container-1', mediaId: 'media-1' }),
+    publishCarousel: async () => ({ containerId: 'carousel-1', mediaId: 'media-2' }),
   };
   let server: ReturnType<ReturnType<typeof createApp>['listen']>;
   let origin = '';

@@ -38,6 +38,8 @@ The client follows Meta's publishing flow: create a media container, wait for as
 
 Create or configure a Meta app for Instagram Graph API access, connect the Instagram Professional Account to a Facebook Page, and request the permissions applicable to the account and operation. Typical account/media access uses `instagram_basic` with the required Page permissions; publishing also requires the publishing permission for the chosen login flow. Complete any app review, Page Publishing Authorization, or two-factor authentication requirements shown by Meta.
 
+The dashboard now supports single-image posts, Reels, and carousels. Reel publishing creates a `REELS` container and waits for Meta to report `FINISHED` before publishing. Carousel publishing creates one child container per image or video, waits for video children, creates the parent carousel container, and publishes the parent. The UI enforces 2–10 carousel items and lets each item be an image or video.
+
 The implementation is based on Meta's current documentation for versioned Graph API calls, media listing, and content publishing:
 
 - [Content Publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing)

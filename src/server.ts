@@ -3,9 +3,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config.js';
 import { InstagramApiError, InstagramClient } from './instagram/client.js';
-import type { CreateContainerInput, MediaType } from './instagram/types.js';
+import type { CarouselItemInput, CreateContainerInput, MediaType } from './instagram/types.js';
 
-type InstagramService = Pick<InstagramClient, 'getAccount' | 'listMedia' | 'getPostInsights' | 'getPublishingLimit' | 'publish'>;
+type InstagramService = Pick<InstagramClient, 'getAccount' | 'listMedia' | 'getPostInsights' | 'getPublishingLimit' | 'publish' | 'publishCarousel'>;
+type PublishRequest = CreateContainerInput | (CreateContainerInput & { items: CarouselItemInput[] });
 
 export function createApp(client: InstagramService = new InstagramClient()) {
   const app = express();
@@ -37,7 +38,11 @@ export function createApp(client: InstagramService = new InstagramClient()) {
 
   app.post('/api/publish', asyncHandler(async (req, res) => {
     const input = parsePublishRequest(req.body);
-    res.status(201).json(await client.publish(input));
+    if (input.mediaType === 'CAROUSEL' && 'items' in input) {
+      res.status(201).json(await client.publishCarousel(input.items, input.caption));
+    } else {
+      res.status(201).json(await client.publish(input));
+    }
   }));
 
   app.use(express.static('public', { extensions: ['html'] }));
@@ -53,7 +58,7 @@ export function createApp(client: InstagramService = new InstagramClient()) {
   return app;
 }
 
-function parsePublishRequest(body: unknown): CreateContainerInput {
+function parsePublishRequest(body: unknown): PublishRequest {
   if (!body || typeof body !== 'object') throw new InstagramApiError('Request body must be a JSON object', 400);
   const candidate = body as Record<string, unknown>;
   const mediaType = candidate.mediaType;
@@ -66,6 +71,19 @@ function parsePublishRequest(body: unknown): CreateContainerInput {
     return value === undefined ? undefined : typeof value === 'string' ? value : (() => { throw new InstagramApiError(`${name} must be a string`, 400); })();
   };
   const children = candidate.children === undefined ? undefined : Array.isArray(candidate.children) && candidate.children.every((item) => typeof item === 'string') ? candidate.children as string[] : (() => { throw new InstagramApiError('children must be an array of strings', 400); })();
+  if (mediaType === 'CAROUSEL') {
+    const rawItems = candidate.items;
+    if (!Array.isArray(rawItems)) throw new InstagramApiError('Carousel publishing requires an items array', 400);
+    const items = rawItems.map((item): CarouselItemInput => {
+      if (!item || typeof item !== 'object') throw new InstagramApiError('Each carousel item must be an object', 400);
+      const value = item as Record<string, unknown>;
+      if (value.mediaType !== 'IMAGE' && value.mediaType !== 'VIDEO') throw new InstagramApiError('Carousel items must be IMAGE or VIDEO', 400);
+      const urlName = value.mediaType === 'IMAGE' ? 'imageUrl' : 'videoUrl';
+      if (typeof value[urlName] !== 'string') throw new InstagramApiError(`${urlName} is required for carousel items`, 400);
+      return { mediaType: value.mediaType, [urlName]: value[urlName] } as CarouselItemInput;
+    });
+    return { mediaType: 'CAROUSEL', caption: text('caption'), items };
+  }
   return {
     mediaType: mediaType as MediaType,
     imageUrl: text('imageUrl'),

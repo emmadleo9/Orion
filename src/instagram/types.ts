@@ -77,6 +77,12 @@ export interface CreateContainerInput {
   children?: string[];
 }
 
+export interface CarouselItemInput {
+  mediaType: 'IMAGE' | 'VIDEO';
+  imageUrl?: string;
+  videoUrl?: string;
+}
+
 export interface PublishResult {
   containerId: string;
   mediaId: string;
