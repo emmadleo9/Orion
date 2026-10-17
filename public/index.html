@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Orion Instagram command center" />
+    <title>Orion / Instagram Command Center</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div><span class="eyebrow">ORION / SOCIAL OPS</span><h1>Instagram command center</h1></div>
+        <div class="status-pill"><span class="pulse"></span><span id="connection-status">Checking connection</span></div>
+      </header>
+
+      <section class="hero-grid">
+        <article class="hero-card">
+          <div class="hero-copy"><span class="eyebrow">CONNECTED ACCOUNT</span><h2 id="account-name">Loading account…</h2><p id="account-bio">Pulling professional account context from Meta.</p></div>
+          <img id="avatar" class="avatar" alt="Instagram profile" hidden />
+          <div class="stats"><div><strong id="followers">—</strong><span>followers</span></div><div><strong id="media-count">—</strong><span>media</span></div><div><strong id="following">—</strong><span>following</span></div></div>
+        </article>
+        <article class="signal-card"><span class="eyebrow">PUBLISHING SIGNAL</span><strong id="quota">—</strong><p>posts used in the current moving window</p><div class="meter"><span id="quota-meter"></span></div><small id="quota-label">Limit data loads with account context.</small></article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel"><div class="panel-heading"><div><span class="eyebrow">RECENT MEDIA</span><h2>Latest posts</h2></div><button class="ghost" id="refresh">Refresh</button></div><div id="posts" class="posts"><p class="muted">Loading recent media…</p></div></article>
+        <article class="panel publish-panel"><span class="eyebrow">PUBLISH</span><h2>Ship a post</h2><p class="muted">Meta fetches the image from a public HTTPS URL. Tokens stay server-side.</p><form id="publish-form"><label>Image URL<input name="imageUrl" type="url" placeholder="https://cdn.example.com/image.jpg" required /></label><label>Caption<textarea name="caption" maxlength="2200" rows="5" placeholder="Write something worth stopping for…"></textarea></label><label>Alt text<input name="altText" maxlength="1000" placeholder="Describe the image" /></label><button class="primary" type="submit">Create and publish <span>↗</span></button><p id="publish-result" class="form-result" role="status"></p></form></article>
+      </section>
+      <footer><span>Orion v1.0</span><span>Graph API v26.0 · Professional accounts</span></footer>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
