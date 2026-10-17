@@ -1,2 +1,2 @@
 
-.header-actions{display:flex;align-items:center;gap:12px}
+.verification-score{display:flex;align-items:baseline;gap:10px;margin:24px 0}.verification-score strong{font-size:48px;letter-spacing:-.08em}.verification-score span,.ci-status small{color:var(--muted);font-size:12px}.ci-status{display:flex;align-items:center;gap:10px;margin:16px 0}.ci-status strong,.ci-status small{display:block}.status-dot{width:10px;height:10px;border-radius:50%;background:#d2aa27}.status-dot.ok{background:var(--green)}.status-dot.bad{background:var(--accent)}.verification-link{display:inline-block;text-decoration:none;color:inherit}

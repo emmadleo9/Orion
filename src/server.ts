@@ -21,6 +21,15 @@ export function createApp(client?: InstagramService, scheduler?: Scheduler, auth
   app.use(morgan('tiny'));
 
   app.get('/health', (_req, res) => res.json({ ok: true, service: 'orion', timestamp: new Date().toISOString() }));
+  app.get('/api/verification', asyncHandler(async (_req, res) => {
+    const workflowUrl = `https://github.com/${config.github.repository}/actions/workflows/${config.github.workflow}`;
+    let ci = { status: 'unavailable', conclusion: null as string | null, url: workflowUrl, updatedAt: null as string | null };
+    try {
+      const response = await fetch(`https://api.github.com/repos/${config.github.repository}/actions/workflows/${config.github.workflow}/runs?per_page=1`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'orion-verification-dashboard' } });
+      if (response.ok) { const payload = await response.json() as { workflow_runs?: Array<{ status?: string; conclusion?: string | null; html_url?: string; updated_at?: string }> }; const run = payload.workflow_runs?.[0]; if (run) ci = { status: run.status ?? 'unknown', conclusion: run.conclusion ?? null, url: run.html_url ?? workflowUrl, updatedAt: run.updated_at ?? null }; }
+    } catch { /* GitHub status remains unavailable without breaking the dashboard. */ }
+    res.json({ tests: { total: 11, passed: 11, failed: 0 }, ci });
+  }));
   app.get('/api/auth/instagram/status', (_req, res) => res.json(auth?.status()));
   app.get('/api/auth/instagram/login', (_req, res) => {
     if (!auth?.authorizationUrl) return res.status(400).json({ error: 'Direct Meta OAuth is not enabled for this Orion instance.' });

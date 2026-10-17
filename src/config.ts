@@ -13,6 +13,10 @@ function positiveInt(name: string, fallback: number): number {
 export const config = {
   port: positiveInt('PORT', 3000),
   host: process.env.HOST ?? '0.0.0.0',
+  github: {
+    repository: process.env.ORION_GITHUB_REPOSITORY ?? 'emmadleo9/Orion',
+    workflow: process.env.ORION_GITHUB_WORKFLOW ?? 'instagram-integration.yml',
+  },
   oauth: {
     clientId: process.env.INSTAGRAM_OAUTH_CLIENT_ID ?? '',
     clientSecret: process.env.INSTAGRAM_OAUTH_CLIENT_SECRET ?? '',

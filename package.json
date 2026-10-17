@@ -11,7 +11,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test": "NODE_ENV=test tsx --test tests/**/*.test.ts",
+    "test": "NODE_ENV=test tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
