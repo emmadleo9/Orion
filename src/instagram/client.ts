@@ -4,9 +4,11 @@ import type {
   CreateContainerInput,
   GraphErrorPayload,
   InstagramAccount,
-  InstagramInsightsResponse,
-  InstagramListResponse,
-  InstagramMedia,
+	InstagramInsightsResponse,
+	InstagramListResponse,
+	InstagramMedia,
+	InstagramCommentsResponse,
+	EngagementSummary,
   PublishResult,
   PublishingLimit,
   CarouselItemInput,
@@ -91,10 +93,24 @@ export class InstagramClient {
     return this.request<InstagramListResponse<InstagramMedia>>(`${this.options.userId}/media?${query}`);
   }
 
-  async getPostInsights(postId: string): Promise<InstagramInsightsResponse> {
-    const metrics = 'reach,impressions,likes,comments,saved,shares,total_interactions,plays';
-    return this.request<InstagramInsightsResponse>(`${encodeURIComponent(postId)}/insights?metric=${metrics}`);
-  }
+	async getPostInsights(postId: string): Promise<InstagramInsightsResponse> {
+		const metrics = 'reach,impressions,likes,comments,saved,shares,total_interactions,plays';
+		return this.request<InstagramInsightsResponse>(`${encodeURIComponent(postId)}/insights?metric=${metrics}`);
+	}
+
+	async getPostComments(postId: string, limit = 25): Promise<InstagramCommentsResponse> {
+		const query = new URLSearchParams({ fields: 'id,text,username,timestamp,like_count', limit: String(Math.min(Math.max(limit, 1), 100)) });
+		return this.request<InstagramCommentsResponse>(`${encodeURIComponent(postId)}/comments?${query}`);
+	}
+
+	async getEngagement(postId: string): Promise<EngagementSummary> {
+		const [insights, comments] = await Promise.all([this.getPostInsights(postId), this.getPostComments(postId)]);
+		const metric = (name: string): number => {
+			const value = insights.data.find((item) => item.name === name)?.values?.[0]?.value;
+			return typeof value === 'number' ? value : 0;
+		};
+		return { mediaId: postId, likes: metric('likes'), comments: metric('comments') || comments.data.length, saves: metric('saved'), shares: metric('shares'), reach: metric('reach'), impressions: metric('impressions'), totalInteractions: metric('total_interactions'), recentComments: comments.data };
+	}
 
   async getPublishingLimit(): Promise<PublishingLimit> {
     return this.request<PublishingLimit>(`${this.options.userId}/content_publishing_limit`);

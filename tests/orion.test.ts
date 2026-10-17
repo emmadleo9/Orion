@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import fs from 'node:fs';
 import { InstagramClient } from '../src/instagram/client.js';
 import { createApp } from '../src/server.js';
+import { Scheduler } from '../src/scheduler.js';
 
 process.env.INSTAGRAM_ACCESS_TOKEN = 'test-token';
 process.env.INSTAGRAM_USER_ID = 'test-user';
@@ -52,11 +54,14 @@ describe('Orion HTTP API', () => {
     getPublishingLimit: async () => ({ data: [{ quota_usage: 4, config: { quota_total: 100 } }] }),
     publish: async () => ({ containerId: 'container-1', mediaId: 'media-1' }),
     publishCarousel: async () => ({ containerId: 'carousel-1', mediaId: 'media-2' }),
+    getEngagement: async () => ({ mediaId: 'post-1', likes: 20, comments: 3, saves: 4, shares: 5, reach: 100, impressions: 140, totalInteractions: 32, recentComments: [] }),
   };
   let server: ReturnType<ReturnType<typeof createApp>['listen']>;
+  const scheduleFile = `/tmp/orion-schedules-${process.pid}.json`;
+  let scheduler: Scheduler;
   let origin = '';
-  before(async () => { server = createApp(fake).listen(0); await new Promise<void>((resolve) => server.once('listening', resolve)); const address = server.address(); if (address && typeof address !== 'string') origin = `http://127.0.0.1:${address.port}`; });
-  after(() => server.close());
+  before(async () => { scheduler = new Scheduler(async () => ({ containerId: 'scheduled-container', mediaId: 'scheduled-media' }), scheduleFile); server = createApp(fake, scheduler).listen(0); await new Promise<void>((resolve) => server.once('listening', resolve)); const address = server.address(); if (address && typeof address !== 'string') origin = `http://127.0.0.1:${address.port}`; });
+  after(() => { scheduler.close(); server.close(); fs.rmSync(scheduleFile, { force: true }); });
   it('serves health and dashboard API routes', async () => {
     const health = await fetch(`${origin}/health`);
     assert.equal(health.status, 200);
@@ -67,5 +72,20 @@ describe('Orion HTTP API', () => {
   it('validates publish requests', async () => {
     const response = await fetch(`${origin}/api/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mediaType: 'INVALID' }) });
     assert.equal(response.status, 400);
+  });
+  it('generates caption suggestions and serves engagement data', async () => {
+    const caption = await fetch(`${origin}/api/captions/generate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic: 'launch day', tone: 'bold' }) });
+    assert.equal(caption.status, 200);
+    assert.equal((await caption.json()).suggestions.length, 3);
+    const engagement = await fetch(`${origin}/api/posts/post-1/engagement`);
+    assert.equal((await engagement.json()).shares, 5);
+  });
+  it('creates and cancels a future scheduled post', async () => {
+    const scheduled = await fetch(`${origin}/api/schedules`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ publishAt: new Date(Date.now() + 60_000).toISOString(), payload: { mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/scheduled.jpg', caption: 'scheduled' } }) });
+    assert.equal(scheduled.status, 201);
+    const job = await scheduled.json();
+    assert.equal(job.status, 'SCHEDULED');
+    const cancelled = await fetch(`${origin}/api/schedules/${job.id}`, { method: 'DELETE' });
+    assert.equal((await cancelled.json()).status, 'CANCELLED');
   });
 });

@@ -21,7 +21,7 @@ Open `http://localhost:3000`. The browser only talks to Orion's server; the Meta
 
 `INSTAGRAM_ACCESS_TOKEN` is the user access token with the permissions required by the Meta app and account flow. `INSTAGRAM_USER_ID` is the Instagram Professional Account ID. `INSTAGRAM_GRAPH_VERSION` defaults to `v26.0` and can be pinned explicitly. The remaining variables control server binding and video-container polling.
 
-For publishing, the image or video URL must be public HTTPS because Meta retrieves the media from that URL. The service supports `IMAGE`, `VIDEO`, `REELS`, `STORIES`, and `CAROUSEL` containers at the client level. The dashboard intentionally starts with single-image publishing as the safest operational workflow.
+For publishing, the image or video URL must be public HTTPS because Meta retrieves the media from that URL. The service supports `IMAGE`, `VIDEO`, `REELS`, `STORIES`, and `CAROUSEL` containers at the client level.
 
 ## HTTP API
 
@@ -29,23 +29,22 @@ For publishing, the image or video URL must be public HTTPS because Meta retriev
 - `GET /api/account` returns the configured professional account.
 - `GET /api/posts?limit=12&after=...` lists recent media.
 - `GET /api/posts/:postId/insights` returns media insights.
+- `GET /api/posts/:postId/engagement` aggregates likes, comments, saves, shares, reach, impressions, and recent comments.
 - `GET /api/publishing-limit` returns current publishing-limit usage.
-- `POST /api/publish` accepts `{ "mediaType": "IMAGE", "imageUrl": "https://…", "caption": "…", "altText": "…" }`.
+- `POST /api/publish` publishes an image, Reel, or carousel immediately.
+- `GET /api/schedules` lists scheduled, processing, published, failed, and cancelled jobs.
+- `POST /api/schedules` accepts `{ "publishAt": "2026-10-18T12:00:00.000Z", "payload": { "mediaType": "IMAGE", "imageUrl": "https://…", "caption": "…" } }`.
+- `DELETE /api/schedules/:id` cancels a scheduled job before it publishes.
+- `POST /api/captions/generate` accepts `{ "topic": "launch day", "tone": "bold", "callToAction": "What do you think?" }` and returns three caption/hashtag suggestions.
 
-The client follows Meta's publishing flow: create a media container, wait for asynchronous video containers to finish, then publish the container. Errors are returned without access-token material.
+Schedules persist in `.orion-data/schedules.json` and are processed by the Orion server while it is running. Use an external process manager or container restart policy for unattended operation. The caption lab is deterministic and local; it does not send content to an external AI provider.
 
 ## Meta setup
 
 Create or configure a Meta app for Instagram Graph API access, connect the Instagram Professional Account to a Facebook Page, and request the permissions applicable to the account and operation. Typical account/media access uses `instagram_basic` with the required Page permissions; publishing also requires the publishing permission for the chosen login flow. Complete any app review, Page Publishing Authorization, or two-factor authentication requirements shown by Meta.
 
-The dashboard now supports single-image posts, Reels, and carousels. Reel publishing creates a `REELS` container and waits for Meta to report `FINISHED` before publishing. Carousel publishing creates one child container per image or video, waits for video children, creates the parent carousel container, and publishes the parent. The UI enforces 2–10 carousel items and lets each item be an image or video.
-
-The implementation is based on Meta's current documentation for versioned Graph API calls, media listing, and content publishing:
-
-- [Content Publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing)
-- [IG User Media](https://developers.facebook.com/documentation/instagram-platform/instagram-graph-api/reference/ig-user/media)
-- [Graph API Versioning](https://developers.facebook.com/docs/graph-api/guides/versioning)
+The dashboard supports single-image posts, Reels, carousels, scheduled publishing, engagement analytics, and caption/hashtag suggestions. Reel publishing creates a `REELS` container and waits for Meta to report `FINISHED` before publishing. Carousel publishing creates one child container per image or video, waits for video children, creates the parent carousel container, and publishes the parent.
 
 ## Live smoke test
 
-The automated test suite uses mocked responses and does not need a real token. After configuring `.env`, run `npm start`, then visit the dashboard. A successful account load and recent-media grid confirm account access. Publishing should be tested with a non-sensitive image hosted on a public HTTPS CDN and the dashboard form.
+The automated test suite uses mocked responses and does not need a real token. After configuring `.env`, run `npm start`, then visit the dashboard. A successful account load and recent-media grid confirm account access. Publishing should be tested with a non-sensitive image hosted on a public HTTPS CDN. Engagement requires media-insights and comments permissions for the configured account.
