@@ -13,6 +13,16 @@ function positiveInt(name: string, fallback: number): number {
 export const config = {
   port: positiveInt('PORT', 3000),
   host: process.env.HOST ?? '0.0.0.0',
+  oauth: {
+    clientId: process.env.INSTAGRAM_OAUTH_CLIENT_ID ?? '',
+    clientSecret: process.env.INSTAGRAM_OAUTH_CLIENT_SECRET ?? '',
+    redirectUri: process.env.INSTAGRAM_OAUTH_REDIRECT_URI ?? 'http://localhost:3000/api/auth/instagram/callback',
+  },
+  connector: {
+    enabled: process.env.ORION_INSTAGRAM_PROVIDER === 'connector',
+    bridgeUrl: process.env.ORION_CONNECTOR_BRIDGE_URL ?? '',
+    sharedSecret: process.env.ORION_CONNECTOR_BRIDGE_SECRET ?? '',
+  },
   instagram: {
     accessToken: process.env.INSTAGRAM_ACCESS_TOKEN ?? '',
     userId: process.env.INSTAGRAM_USER_ID ?? '',

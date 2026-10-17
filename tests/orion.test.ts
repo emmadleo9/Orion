@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { InstagramClient } from '../src/instagram/client.js';
 import { createApp } from '../src/server.js';
 import { Scheduler } from '../src/scheduler.js';
+import { DirectMetaOAuth } from '../src/instagram/provider.js';
 
 process.env.INSTAGRAM_ACCESS_TOKEN = 'test-token';
 process.env.INSTAGRAM_USER_ID = 'test-user';
@@ -43,6 +44,23 @@ describe('InstagramClient', () => {
       { mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/two.jpg' },
     ], 'carousel caption');
     assert.deepEqual(result, { containerId: 'carousel-1', mediaId: 'media-2' });
+  });
+});
+
+describe('Direct Meta OAuth', () => {
+  it('creates a stateful login URL and exchanges the callback code server-side', async () => {
+    const oauth = new DirectMetaOAuth('app-1', 'secret-1', 'http://localhost:3000/api/auth/instagram/callback', async (url, init) => {
+      if (String(url).startsWith('https://api.instagram.com/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'short-token', user_id: 'ig-user-1' }), { status: 200 });
+      assert.equal(String(url).startsWith('https://graph.instagram.com/access_token?'), true);
+      assert.equal(init?.method, undefined);
+      return new Response(JSON.stringify({ access_token: 'long-token', expires_in: 5_184_000 }), { status: 200 });
+    });
+    const login = new URL(oauth.authorizationUrl());
+    assert.equal(login.searchParams.get('client_id'), 'app-1');
+    const state = login.searchParams.get('state');
+    assert.ok(state);
+    await oauth.completeAuthorization('one-time-code', state);
+    assert.deepEqual(oauth.status(), { mode: 'direct-oauth', connected: true, accountId: 'ig-user-1' });
   });
 });
 

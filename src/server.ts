@@ -2,14 +2,17 @@ import express, { type ErrorRequestHandler, type Request, type Response } from '
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config.js';
-import { InstagramApiError, InstagramClient } from './instagram/client.js';
+import { InstagramApiError } from './instagram/client.js';
 import type { CaptionRequest, CarouselItemInput, CreateContainerInput, MediaType, ScheduledPost } from './instagram/types.js';
+import { createInstagramRuntime, type AuthProvider, type InstagramService } from './instagram/provider.js';
 import { Scheduler } from './scheduler.js';
 
-type InstagramService = Pick<InstagramClient, 'getAccount' | 'listMedia' | 'getPostInsights' | 'getPublishingLimit' | 'publish' | 'publishCarousel'> & Partial<Pick<InstagramClient, 'getEngagement'>>;
 type PublishRequest = CreateContainerInput | (CreateContainerInput & { items: CarouselItemInput[] });
 
-export function createApp(client: InstagramService = new InstagramClient(), scheduler?: Scheduler) {
+export function createApp(client?: InstagramService, scheduler?: Scheduler, auth?: AuthProvider) {
+  const runtime = client ? { service: client, auth: auth ?? { mode: 'unconfigured' as const, connected: false, status: () => ({ mode: 'unconfigured' as const, connected: false }) } } : createInstagramRuntime();
+  client = runtime.service;
+  auth = runtime.auth;
   const app = express();
   const activeScheduler = scheduler ?? new Scheduler((payload) => payload.mediaType === 'CAROUSEL' && 'items' in payload ? client.publishCarousel(payload.items, payload.caption) : client.publish(payload));
   app.disable('x-powered-by');
@@ -18,6 +21,19 @@ export function createApp(client: InstagramService = new InstagramClient(), sche
   app.use(morgan('tiny'));
 
   app.get('/health', (_req, res) => res.json({ ok: true, service: 'orion', timestamp: new Date().toISOString() }));
+  app.get('/api/auth/instagram/status', (_req, res) => res.json(auth?.status()));
+  app.get('/api/auth/instagram/login', (_req, res) => {
+    if (!auth?.authorizationUrl) return res.status(400).json({ error: 'Direct Meta OAuth is not enabled for this Orion instance.' });
+    res.redirect(auth.authorizationUrl());
+  });
+  app.get('/api/auth/instagram/callback', asyncHandler(async (req, res) => {
+    if (!auth?.completeAuthorization) throw new InstagramApiError('Direct Meta OAuth is not enabled for this Orion instance.', 400);
+    if (typeof req.query.error === 'string') throw new InstagramApiError(String(req.query.error_description ?? req.query.error), 400);
+    if (typeof req.query.code !== 'string' || typeof req.query.state !== 'string') throw new InstagramApiError('Instagram OAuth callback is missing code or state.', 400);
+    await auth.completeAuthorization(req.query.code, req.query.state);
+    res.redirect('/?instagram=connected');
+  }));
+  app.post('/api/auth/instagram/logout', (_req, res) => { auth?.logout?.(); res.status(204).end(); });
   app.get('/api/account', asyncHandler(async (_req, res) => res.json(await client.getAccount())));
   app.get('/api/posts', asyncHandler(async (req, res) => {
     const limit = Number.parseInt(String(req.query.limit ?? '12'), 10);

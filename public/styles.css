@@ -1,2 +1,2 @@
 
-.post-engagement{margin:0 12px 12px;width:calc(100% - 24px)}.post>a{display:block;color:inherit;text-decoration:none}
+.header-actions{display:flex;align-items:center;gap:12px}
