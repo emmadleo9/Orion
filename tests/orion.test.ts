@@ -6,6 +6,7 @@ import { InstagramClient } from '../src/instagram/client.js';
 import { createApp } from '../src/server.js';
 import { Scheduler } from '../src/scheduler.js';
 import { ConnectorBackedInstagramService, DirectMetaOAuth } from '../src/instagram/provider.js';
+import { createConnectorBridge } from '../src/connector-bridge.js';
 
 process.env.INSTAGRAM_ACCESS_TOKEN = 'test-token';
 process.env.INSTAGRAM_USER_ID = 'test-user';
@@ -115,6 +116,21 @@ describe('Connector provider integration', () => {
       assert.equal((await client.publish({ mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/a.jpg' })).mediaId, 'media-1');
       assert.equal((await client.publishCarousel([{ mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/a.jpg' }, { mediaType: 'IMAGE', imageUrl: 'https://cdn.example.com/b.jpg' }])).mediaId, 'media-2');
       assert.deepEqual(calls, ['/instagram/getAccount', '/instagram/listMedia', '/instagram/getEngagement', '/instagram/getPublishingLimit', '/instagram/publish', '/instagram/publishCarousel']);
+    } finally { bridge.close(); }
+  });
+});
+
+describe('Host-side connector bridge', () => {
+  it('protects bridge operations with the shared secret', async () => {
+    const gateway = { getAccount: async () => ({ id: 'ig-user-1' }), listMedia: async () => ({ data: [] }), getPostInsights: async () => ({ data: [] }), getEngagement: async () => ({ mediaId: 'x', likes: 0, comments: 0, saves: 0, shares: 0, reach: 0, impressions: 0, totalInteractions: 0, recentComments: [] }), getPublishingLimit: async () => ({ data: [] }), publish: async () => ({ containerId: 'c', mediaId: 'm' }), publishCarousel: async () => ({ containerId: 'c', mediaId: 'm' }) };
+    const bridge = createConnectorBridge(gateway, 'bridge-secret').listen(0);
+    await new Promise<void>((resolve) => bridge.once('listening', resolve));
+    const address = bridge.address(); assert.ok(address && typeof address !== 'string');
+    try {
+      const denied = await fetch(`http://127.0.0.1:${address.port}/instagram/getAccount`, { method: 'POST' });
+      assert.equal(denied.status, 401);
+      const allowed = await fetch(`http://127.0.0.1:${address.port}/instagram/getAccount`, { method: 'POST', headers: { authorization: 'Bearer bridge-secret', 'content-type': 'application/json' }, body: '{}' });
+      assert.deepEqual(await allowed.json(), { result: { id: 'ig-user-1' } });
     } finally { bridge.close(); }
   });
 });

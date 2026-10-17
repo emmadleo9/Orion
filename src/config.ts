@@ -17,6 +17,9 @@ export const config = {
     clientId: process.env.INSTAGRAM_OAUTH_CLIENT_ID ?? '',
     clientSecret: process.env.INSTAGRAM_OAUTH_CLIENT_SECRET ?? '',
     redirectUri: process.env.INSTAGRAM_OAUTH_REDIRECT_URI ?? 'http://localhost:3000/api/auth/instagram/callback',
+    authorizeUrl: process.env.INSTAGRAM_OAUTH_AUTHORIZE_URL ?? 'https://www.instagram.com/oauth/authorize',
+    tokenUrl: process.env.INSTAGRAM_OAUTH_TOKEN_URL ?? 'https://api.instagram.com/oauth/access_token',
+    graphUrl: process.env.INSTAGRAM_OAUTH_GRAPH_URL ?? 'https://graph.instagram.com',
   },
   connector: {
     enabled: process.env.ORION_INSTAGRAM_PROVIDER === 'connector',

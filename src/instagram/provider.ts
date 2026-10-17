@@ -28,7 +28,7 @@ export class DirectMetaOAuth implements AuthProvider {
   private readonly states = new Map<string, number>();
   private readonly scopes = (process.env.INSTAGRAM_OAUTH_SCOPES ?? 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments').split(',').map((scope) => scope.trim()).filter(Boolean);
 
-  constructor(private readonly clientId = config.oauth.clientId, private readonly clientSecret = config.oauth.clientSecret, private readonly redirectUri = config.oauth.redirectUri, private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(private readonly clientId = config.oauth.clientId, private readonly clientSecret = config.oauth.clientSecret, private readonly redirectUri = config.oauth.redirectUri, private readonly fetchImpl: typeof fetch = fetch, private readonly endpoints = { authorize: config.oauth.authorizeUrl, token: config.oauth.tokenUrl, graph: config.oauth.graphUrl }) {}
 
   status() { return { mode: this.mode, connected: Boolean(this.token && this.token.expiresAt > Date.now()), accountId: this.token?.userId }; }
 
@@ -37,16 +37,16 @@ export class DirectMetaOAuth implements AuthProvider {
     const state = crypto.randomBytes(24).toString('base64url');
     this.states.set(state, Date.now() + 10 * 60 * 1000);
     const query = new URLSearchParams({ client_id: this.clientId, redirect_uri: this.redirectUri, response_type: 'code', scope: this.scopes.join(','), state, force_reauth: 'false' });
-    return `https://www.instagram.com/oauth/authorize?${query}`;
+    return `${this.endpoints.authorize}?${query}`;
   }
 
   async completeAuthorization(code: string, state: string): Promise<void> {
     const expiry = this.states.get(state); this.states.delete(state);
     if (!expiry || expiry <= Date.now()) throw new InstagramApiError('OAuth state is missing, expired, or already used.', 400);
     if (!code) throw new InstagramApiError('Instagram did not return an authorization code.', 400);
-    const short = await this.formRequest('https://api.instagram.com/oauth/access_token', { client_id: this.clientId, client_secret: this.clientSecret, grant_type: 'authorization_code', redirect_uri: this.redirectUri, code });
+    const short = await this.formRequest(this.endpoints.token, { client_id: this.clientId, client_secret: this.clientSecret, grant_type: 'authorization_code', redirect_uri: this.redirectUri, code });
     const shortToken = this.extractToken(short); const userId = this.extractUserId(short);
-    const long = await this.getJson('https://graph.instagram.com/access_token', { grant_type: 'ig_exchange_token', client_secret: this.clientSecret, access_token: shortToken });
+    const long = await this.getJson(`${this.endpoints.graph}/access_token`, { grant_type: 'ig_exchange_token', client_secret: this.clientSecret, access_token: shortToken });
     const accessToken = this.extractToken(long); const expiresIn = Number(long.expires_in ?? 60 * 24 * 60 * 60);
     this.token = { accessToken, userId, expiresAt: Date.now() + Math.max(1, expiresIn) * 1000 };
   }
